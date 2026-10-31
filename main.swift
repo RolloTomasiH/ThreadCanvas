@@ -1,11 +1,49 @@
 import Cocoa
 import WebKit
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate {
     var window: NSWindow!
     var webView: WKWebView!
     var serverProcess: Process?
     let port = 28791
+    var loadRetryCount = 0
+
+    func killPortProcess(port: Int) {
+        let p = Process()
+        p.launchPath = "/bin/sh"
+        p.arguments = ["-c", "lsof -ti :\(port) | xargs kill -9 2>/dev/null || true"]
+        try? p.run()
+        p.waitUntilExit()
+    }
+
+    func loadAppURL() {
+        if let url = URL(string: "http://127.0.0.1:\(self.port)") {
+            let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+            self.webView.load(request)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if loadRetryCount < 20 {
+            loadRetryCount += 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.loadAppURL()
+            }
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        if loadRetryCount < 20 {
+            loadRetryCount += 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.loadAppURL()
+            }
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        loadRetryCount = 0
+    }
 
     func getZhipuApiKey() -> String {
         if let envKey = ProcessInfo.processInfo.environment["ZHIPU_API_KEY"], !envKey.isEmpty {
@@ -80,6 +118,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         config.userContentController.addUserScript(userScript)
 
         webView = WKWebView(frame: windowRect, configuration: config)
+        webView.navigationDelegate = self
         webView.autoresizingMask = [.width, .height]
         window.contentView = webView
 
@@ -89,19 +128,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Clear WebKit cache on launch so fresh updates load immediately
         WKWebsiteDataStore.default().removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], modifiedSince: Date.distantPast) { }
 
-        // Wait brief moment for server socket to bind, then load with hard-refresh policy
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if let url = URL(string: "http://127.0.0.1:\(self.port)") {
-                let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
-                self.webView.load(request)
-            }
-        }
+        // Start loading URL; if server takes 100-300ms to bind, navigationDelegate retries seamlessly
+        self.loadAppURL()
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
     func startServer(distPath: String) {
+        killPortProcess(port: self.port)
+
         let task = Process()
         task.launchPath = "/usr/bin/python3"
 
@@ -128,8 +164,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 "--directory", distPath
             ]
         }
-        task.standardOutput = Pipe()
-        task.standardError = Pipe()
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
 
         do {
             try task.run()
@@ -229,6 +265,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             proc.terminate()
             serverProcess = nil
         }
+        killPortProcess(port: self.port)
     }
 }
 

@@ -249,7 +249,23 @@ class ThreadCanvasHandler(SimpleHTTPRequestHandler):
 
 def run():
     log_proxy(f"ThreadCanvas Server starting on port {PORT}, dir={DIRECTORY}")
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), ThreadCanvasHandler)
+    ThreadingHTTPServer.allow_reuse_address = True
+    server = None
+    for attempt in range(10):
+        try:
+            server = ThreadingHTTPServer(("127.0.0.1", PORT), ThreadCanvasHandler)
+            break
+        except OSError as e:
+            if "Address already in use" in str(e):
+                log_proxy(f"Port {PORT} busy, waiting 0.3s (attempt {attempt+1}/10)...")
+                time.sleep(0.3)
+            else:
+                raise e
+
+    if not server:
+        log_proxy(f"Failed to bind port {PORT} after retries")
+        return
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
