@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>ThreadCanvas · 研思分支画布</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2318181B' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='7' width='7' height='6' rx='1.5'/><rect x='14' y='3' width='7' height='6' rx='1.5'/><rect x='14' y='15' width='7' height='6' rx='1.5'/><path d='M10 10h2a2 2 0 0 0 2-2V6'/><path d='M10 10h2a2 2 0 0 1 2 2v6'/></svg>" />
+    <style>
+      /* macOS Native Titlebar Dragging support */
+      .titlebar-drag-region {
+        -webkit-app-region: drag;
+        user-select: none;
+      }
+      .no-drag {
+        -webkit-app-region: no-drag;
+      }
+      /* Custom scrollbars */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.4);
+        border-radius: 9999px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.6);
+      }
+      /* Prevent unwanted text selection while dragging canvas */
+      .canvas-panning {
+        user-select: none;
+        cursor: grab !important;
+      }
+      .canvas-panning:active {
+        cursor: grabbing !important;
+      }
+    </style>
+  </head>
+  <body class="bg-[#F8FAFC] text-slate-800 antialiased overflow-hidden select-none m-0 p-0 font-sans">
+    <div id="root" class="w-screen h-screen"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
