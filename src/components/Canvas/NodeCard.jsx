@@ -83,8 +83,81 @@ export default function NodeCard({
     }
   };
 
+  const dragScrollStateRef = useRef({
+    isDown: false,
+    hasMoved: false,
+    startY: 0,
+    scrollTop: 0,
+    targetEl: null
+  });
+
+  // Handle pointer down on card body for isolated drag-to-scroll
+  const handleBodyPointerDown = (e) => {
+    e.stopPropagation();
+
+    if (
+      e.target.tagName === 'BUTTON' || 
+      e.target.tagName === 'INPUT' || 
+      e.target.tagName === 'TEXTAREA' ||
+      e.target.tagName === 'A' ||
+      e.target.closest('button') ||
+      e.target.closest('input') ||
+      e.target.closest('textarea') ||
+      e.target.closest('a')
+    ) {
+      return;
+    }
+
+    const scrollEl = e.target.closest('[data-card-scroll="true"], .overflow-y-auto') ||
+                     cardBodyRef.current?.querySelector('[data-card-scroll="true"], .overflow-y-auto');
+
+    if (scrollEl) {
+      dragScrollStateRef.current = {
+        isDown: true,
+        hasMoved: false,
+        startY: e.clientY,
+        scrollTop: scrollEl.scrollTop,
+        targetEl: scrollEl
+      };
+    }
+  };
+
+  const handleBodyPointerMove = (e) => {
+    const state = dragScrollStateRef.current;
+    if (!state.isDown || !state.targetEl) return;
+
+    const dy = e.clientY - state.startY;
+    if (Math.abs(dy) > 4) {
+      state.hasMoved = true;
+      state.targetEl.scrollTop = state.scrollTop - dy;
+      const sel = window.getSelection();
+      if (sel && sel.type === 'Range') {
+        sel.removeAllRanges();
+      }
+    }
+  };
+
+  const handleBodyPointerUp = (e) => {
+    const state = dragScrollStateRef.current;
+    const wasDragging = state.hasMoved;
+    state.isDown = false;
+    state.targetEl = null;
+
+    if (wasDragging) {
+      e.stopPropagation();
+      e.preventDefault();
+      setTimeout(() => {
+        state.hasMoved = false;
+      }, 60);
+    }
+  };
+
   // Handle click on card body (not on buttons/inputs)
   const handleCardBodyClick = (e) => {
+    if (dragScrollStateRef.current.hasMoved) {
+      return;
+    }
+
     if (
       e.target.tagName === 'BUTTON' || 
       e.target.tagName === 'INPUT' || 
@@ -172,6 +245,9 @@ export default function NodeCard({
       id={`node-${node.id}`}
       style={cardOuterStyle}
       onWheel={handleCardWheel}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(node.id);
@@ -186,6 +262,7 @@ export default function NodeCard({
       {/* Node Header */}
       <div
         onPointerDown={(e) => {
+          e.stopPropagation();
           if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
             onNodePointerDown(e, node.id);
           }
@@ -355,6 +432,10 @@ export default function NodeCard({
       {!node.collapsed && (
         <div 
           ref={cardBodyRef}
+          onPointerDown={handleBodyPointerDown}
+          onPointerMove={handleBodyPointerMove}
+          onPointerUp={handleBodyPointerUp}
+          onPointerCancel={handleBodyPointerUp}
           onMouseUp={handleMouseUp}
           onClick={handleCardBodyClick}
           className="p-4 space-y-3.5"

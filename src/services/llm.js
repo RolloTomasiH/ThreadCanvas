@@ -277,6 +277,13 @@ export function getStoredLLMSettings() {
       };
     }
 
+    // Auto-detect native environment key injected by macOS Swift app
+    if ((!merged.apiKey || !merged.providerKeys.zhipu) && typeof window !== 'undefined' && window.__NATIVE_ENV__?.ZHIPU_API_KEY) {
+      const nativeKey = window.__NATIVE_ENV__.ZHIPU_API_KEY;
+      if (!merged.apiKey) merged.apiKey = nativeKey;
+      merged.providerKeys.zhipu = nativeKey;
+    }
+
     // Auto-detect protocol if missing
     if (!merged.protocol) {
       const preset = MODEL_PRESETS.find(p => p.id === merged.selectedPresetId);
@@ -452,9 +459,8 @@ export async function streamChatCompletion({
   const isAppPort = typeof window !== 'undefined' && window.location.port === '28791';
   const proxyUrl = isAppPort ? '/api/proxy' : 'http://127.0.0.1:28791/api/proxy';
 
-  // For external domains without guaranteed browser CORS (Zhipu BigModel / Anthropic),
-  // route through embedded proxy
-  if (typeof window !== 'undefined' && (targetUrl.includes('open.bigmodel.cn') || targetUrl.includes('anthropic.com'))) {
+  // Route all external HTTPS domains through local proxy to eliminate browser CORS restrictions
+  if (typeof window !== 'undefined' && targetUrl.startsWith('https://')) {
     requestUrl = proxyUrl;
     headers['X-Target-Url'] = targetUrl;
   }

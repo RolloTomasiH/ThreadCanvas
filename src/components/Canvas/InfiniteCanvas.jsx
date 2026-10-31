@@ -80,6 +80,36 @@ export default function InfiniteCanvas() {
   const abortControllersRef = useRef(new Map());
   const pendingStreamingNodeIdRef = useRef(null);
 
+  // Auto-sync host environment keys on launch
+  useEffect(() => {
+    fetch('/api/env-keys')
+      .then(res => res.json())
+      .then(keys => {
+        if (!keys) return;
+        setLlmSettings(prev => {
+          const updatedKeys = { ...(prev.providerKeys || {}) };
+          let changed = false;
+          if (!updatedKeys.zhipu && keys.zhipu) { updatedKeys.zhipu = keys.zhipu; changed = true; }
+          if (!updatedKeys.deepseek && keys.deepseek) { updatedKeys.deepseek = keys.deepseek; changed = true; }
+          if (!updatedKeys.anthropic && keys.anthropic) { updatedKeys.anthropic = keys.anthropic; changed = true; }
+          if (!updatedKeys.openai && keys.openai) { updatedKeys.openai = keys.openai; changed = true; }
+
+          let curKey = prev.apiKey;
+          if (!curKey) {
+            curKey = updatedKeys[prev.providerCategory] || updatedKeys.zhipu || '';
+            changed = true;
+          }
+          if (changed) {
+            const next = { ...prev, apiKey: curKey, providerKeys: updatedKeys };
+            saveStoredLLMSettings(next);
+            return next;
+          }
+          return prev;
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   // Sync state to current project & persist
   useEffect(() => {
     setProjects(prevProjects => {
@@ -260,6 +290,11 @@ export default function InfiniteCanvas() {
   };
 
   const handleCanvasPointerDown = (e) => {
+    // Explicit guard: if pointer down inside any card, never pan the canvas
+    if (e.target.closest('[id^="node-"]')) {
+      return;
+    }
+
     if (e.target === canvasRef.current || e.target.tagName === 'svg' || e.target.classList.contains('canvas-grid-bg')) {
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
@@ -275,6 +310,10 @@ export default function InfiniteCanvas() {
 
   const handlePointerMove = (e) => {
     if (isPanning) {
+      if (draggingNode) {
+        setIsPanning(false);
+        return;
+      }
       setViewport(prev => ({
         ...prev,
         x: e.clientX - panStart.x,

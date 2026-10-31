@@ -14,7 +14,8 @@ import {
   Sliders, 
   ExternalLink,
   ChevronDown,
-  Server
+  Server,
+  Sparkles
 } from 'lucide-react';
 import { 
   PROVIDER_CATEGORIES, 
@@ -63,6 +64,32 @@ export default function ModelSettingsModal({
       setTimeout(() => {
         keyInputRef.current?.focus();
       }, 100);
+
+      // Auto-load host keys if current key is empty
+      if (!current.apiKey) {
+        fetch('/api/env-keys')
+          .then(res => res.json())
+          .then(keys => {
+            if (!keys) return;
+            const updatedKeys = { ...(current.providerKeys || {}) };
+            if (keys.zhipu) updatedKeys.zhipu = keys.zhipu;
+            if (keys.deepseek) updatedKeys.deepseek = keys.deepseek;
+            if (keys.anthropic) updatedKeys.anthropic = keys.anthropic;
+            if (keys.openai) updatedKeys.openai = keys.openai;
+            const effectiveKey = updatedKeys[current.providerCategory] || keys.zhipu || '';
+            if (effectiveKey) {
+              const next = {
+                ...current,
+                apiKey: effectiveKey,
+                providerKeys: updatedKeys
+              };
+              setSettings(next);
+              saveStoredLLMSettings(next);
+              if (onSettingsUpdated) onSettingsUpdated(next);
+            }
+          })
+          .catch(() => {});
+      }
     }
   }, [isOpen]);
 
@@ -150,6 +177,28 @@ export default function ModelSettingsModal({
       }
     } catch (e) {
       console.warn('Clipboard read error:', e);
+    }
+  };
+
+  const handleSyncEnvKey = async () => {
+    try {
+      const res = await fetch('/api/env-keys');
+      if (res.ok) {
+        const keys = await res.json();
+        const foundKey = keys[activeCategory] || (activeCategory === 'anthropic' && keys.zhipu) || keys.zhipu || '';
+        if (foundKey) {
+          handleKeyChange(foundKey);
+          setTestState({ success: true, duration: 6, reply: `已自动从本机环境变量 (~/.zshrc) 载入密钥` });
+          return;
+        }
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined' && window.__NATIVE_ENV__?.ZHIPU_API_KEY) {
+      handleKeyChange(window.__NATIVE_ENV__.ZHIPU_API_KEY);
+      setTestState({ success: true, duration: 6, reply: '已从原生环境同步智谱密钥' });
+    } else {
+      setTestState({ error: '未在系统环境变量 (~/.zshrc) 中检测到密钥' });
     }
   };
 
@@ -308,6 +357,15 @@ export default function ModelSettingsModal({
               </label>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSyncEnvKey}
+                  className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                  title="自动读取本机 ~/.zshrc 或环境变量中的 API Key"
+                >
+                  <Sparkles className="w-3 h-3 text-blue-500" />
+                  从本机环境读取 Key
+                </button>
                 <button
                   type="button"
                   onClick={handlePasteKey}

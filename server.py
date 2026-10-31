@@ -26,6 +26,56 @@ def log_proxy(msg):
     except Exception:
         pass
 
+def get_local_env_keys():
+    """
+    Safely retrieves developer API keys from local OS environment and user profiles
+    without storing or committing secrets to git.
+    """
+    keys = {
+        "zhipu": os.environ.get("ZHIPU_API_KEY", ""),
+        "deepseek": os.environ.get("DEEPSEEK_API_KEY", ""),
+        "anthropic": os.environ.get("ANTHROPIC_API_KEY", ""),
+        "openai": os.environ.get("OPENAI_API_KEY", "")
+    }
+
+    home = os.path.expanduser("~")
+    for profile in [".zshrc", ".bash_profile", ".zshenv"]:
+        p_path = os.path.join(home, profile)
+        if os.path.isfile(p_path):
+            try:
+                with open(p_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        for env_name, key_name in [
+                            ("ZHIPU_API_KEY", "zhipu"),
+                            ("DEEPSEEK_API_KEY", "deepseek"),
+                            ("ANTHROPIC_API_KEY", "anthropic"),
+                            ("OPENAI_API_KEY", "openai")
+                        ]:
+                            if not keys[key_name] and line.startswith(f"export {env_name}="):
+                                val = line.split("=", 1)[1].strip().strip("\"' ")
+                                if val:
+                                    keys[key_name] = val
+            except Exception:
+                pass
+
+    claude_settings = os.path.join(home, ".claude", "settings.json")
+    if os.path.isfile(claude_settings):
+        try:
+            with open(claude_settings, "r", encoding="utf-8", errors="ignore") as f:
+                cdata = json.load(f)
+                env_dict = cdata.get("env", {})
+                if not keys["anthropic"] and env_dict.get("ANTHROPIC_API_KEY"):
+                    keys["anthropic"] = env_dict.get("ANTHROPIC_API_KEY")
+                if not keys["zhipu"] and "bigmodel" in env_dict.get("ANTHROPIC_BASE_URL", ""):
+                    token = env_dict.get("ANTHROPIC_AUTH_TOKEN", "")
+                    if token:
+                        keys["zhipu"] = token
+        except Exception:
+            pass
+
+    return keys
+
 class ThreadCanvasHandler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -48,6 +98,20 @@ class ThreadCanvasHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def do_GET(self):
+        if self.path.startswith("/api/env-keys"):
+            keys = get_local_env_keys()
+            body = json.dumps(keys).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-cache, no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            super().do_GET()
+
     def do_POST(self):
         if self.path.startswith("/api/proxy"):
             self.handle_proxy_request()
@@ -63,9 +127,26 @@ class ThreadCanvasHandler(SimpleHTTPRequestHandler):
         x_api_key = self.headers.get("x-api-key") or self.headers.get("X-Api-Key")
         anthropic_version = self.headers.get("anthropic-version") or self.headers.get("Anthropic-Version") or "2023-06-01"
 
+        env_keys = get_local_env_keys()
+
+        # Auto-fallback to local machine environment if auth header is missing or empty
+        if not auth_header or auth_header.strip() in ["Bearer", "Bearer undefined", "Bearer null", ""]:
+            if ("open.bigmodel.cn" in target_url or "bigmodel.cn" in target_url) and env_keys.get("zhipu"):
+                auth_header = f"Bearer {env_keys['zhipu']}"
+                log_proxy("Auto-injected ZHIPU_API_KEY from host environment")
+            elif "deepseek" in target_url and env_keys.get("deepseek"):
+                auth_header = f"Bearer {env_keys['deepseek']}"
+                log_proxy("Auto-injected DEEPSEEK_API_KEY from host environment")
+            elif "openai" in target_url and env_keys.get("openai"):
+                auth_header = f"Bearer {env_keys['openai']}"
+                log_proxy("Auto-injected OPENAI_API_KEY from host environment")
+
+        if not x_api_key and "anthropic" in target_url and env_keys.get("anthropic"):
+            x_api_key = env_keys["anthropic"]
+            log_proxy("Auto-injected ANTHROPIC_API_KEY from host environment")
+
         # 1. Zhipu Coding Plan Guard:
-        # Only rewrite if targeting Zhipu
-        if "open.bigmodel.cn" in target_url or "bigmodel.cn" in target_url:
+        if ("open.bigmodel.cn" in target_url or "bigmodel.cn" in target_url) and not ("/api/anthropic" in target_url):
             target_url = "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"
 
             # Parse and enforce supported model (glm-5.3 or glm-4.7)
@@ -80,7 +161,7 @@ class ThreadCanvasHandler(SimpleHTTPRequestHandler):
             except Exception:
                 req_model = "unknown"
 
-        # 2. Anthropic Claude Guard:
+        # 2. Anthropic Claude Guard (supports official api.anthropic.com and adapter):
         elif "anthropic" in target_url or (x_api_key and "sk-ant-" in str(x_api_key)):
             if not target_url.endswith("/messages"):
                 target_url = target_url.rstrip("/") + ("/messages" if "/v1" in target_url else "/v1/messages")
@@ -112,7 +193,6 @@ class ThreadCanvasHandler(SimpleHTTPRequestHandler):
         if x_api_key:
             headers["x-api-key"] = x_api_key
         elif auth_header and "sk-ant-" in auth_header:
-            # If user provided Anthropic key in Authorization header, map to x-api-key
             headers["x-api-key"] = auth_header.replace("Bearer", "").strip()
 
         # If Anthropic endpoint or x-api-key present, add required Anthropic headers
