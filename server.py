@@ -9,13 +9,14 @@ import sys
 import os
 import json
 import time
+import tempfile
 import urllib.request
 import urllib.error
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 28791
-DIRECTORY = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
-LOG_PATH = "/tmp/canvas_proxy.log"
+DIRECTORY = os.path.normpath(sys.argv[2]) if len(sys.argv) > 2 else os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist"))
+LOG_PATH = os.path.join(tempfile.gettempdir(), "canvas_proxy.log")
 
 def log_proxy(msg):
     try:

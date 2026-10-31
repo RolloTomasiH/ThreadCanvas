@@ -32,10 +32,31 @@
 ## 快速上手
 
 ### 环境依赖
-- Node.js >= 18
-- macOS 12.0+ (如需编译原生 macOS 应用包)
+- Node.js >= 18 (用于前端构建)
+- Python >= 3.8 (内置静态服务与 LLM 串流代理)
+- **macOS**：macOS 12.0+ (支持原生 Swift App 编译)
+- **Windows**：Windows 10 / 11 (内置 Microsoft Edge 或 Google Chrome)
 
-### 1. 本地启动运行 (Web 版)
+---
+
+### 平台一键运行
+
+#### 🍎 macOS 原生桌面版
+```bash
+./build_app.sh
+```
+编译完成后自动生成并安装至 `~/Applications/ThreadCanvas.app`，并在桌面生成启动快捷方式。
+
+#### 🪟 Windows 原生桌面版
+1. **一键双击运行**：
+   - 双击根目录下的 **`ThreadCanvas.vbs`**（静默后台启动，无黑框命令行），自动唤起 Microsoft Edge 原生独立桌面应用窗口（无地址栏/标签页）。
+   - 或双击 **`ThreadCanvas.bat`** 启动。
+2. **生成 Windows 桌面快捷方式**：
+   - 双击 **`install_shortcut.bat`**，将自动在 Windows 桌面上创建带官方图标的 `ThreadCanvas.lnk` 快捷方式。
+3. **源码构建 (Windows)**：
+   - 双击 **`build_windows.bat`** 即可自动执行 `npm install`、`npm run build` 并创建桌面快捷方式。
+
+#### 🌐 纯 Web 开发调试版 (跨平台)
 ```bash
 git clone https://github.com/RolloTomasiH/ThreadCanvas.git
 cd ThreadCanvas
@@ -43,12 +64,6 @@ npm install
 npm run dev
 ```
 浏览器打开 `http://localhost:5173` 即可开始使用。首次使用点击顶栏「填入 API Key」输入您自己的 API 密钥即可。
-
-### 2. 打包生成 macOS 原生应用 (`ThreadCanvas.app`)
-```bash
-./build_app.sh
-```
-编译完成后自动生成并安装至 `~/Applications/ThreadCanvas.app`，并在桌面生成快捷方式。
 
 ---
 
