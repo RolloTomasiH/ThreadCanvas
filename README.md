@@ -1,4 +1,4 @@
-# ThreadCanvas · 研思分支画布 (v1.0.0)
+# ThreadCanvas · 研思分支画布 (v1.0.2)
 
 > **ThreadCanvas** 是专为深度行业投研、商业架构拆解与技术推演打造的 **无限画布分支研思工作台**。
 > 结合 LLM 多轮因果推理、划词要点追问、Obsidian Canvas 双向互通与极简工程美学，摆脱线形聊天限制。
@@ -11,12 +11,12 @@
 - **自由探索**：支持触摸板双指平移、捏合缩放（15% ~ 250%）、小地图（Minimap）鸟瞰与一键全图适应。
 - **划词要点追问 (Select-to-Branch)**：在任意解答中划选核心论点，即时唤出 Raycast 风格的极简追问栏，一键生成锚定引述的下游分支卡片。
 - **完整因果溯源 (Ancestry Trace)**：下游分支提问自动溯源整条推演链（根问题 → 根解答 → 引用论点 → 分支追问），大模型感知完整前置上下文，避免割裂。
-- **单卡问答闭环**：提问与推演结论严格收敛于同一张卡片内部，支持卡片独立滚动隔离与折叠。
+- **单卡问答闭环**：提问与推演结论严格收敛于同一张卡片内部，支持卡片内独立的拖拽上下滚动（Drag-to-Scroll），绝不带动整个画布漂移。
 
 ### 2. 多模型研思中枢与协议原生支持
 - **Anthropic Claude 原生支持**：深度接入官方 `/v1/messages` 协议，支持 Claude 3.7 Sonnet 混合深度推理（Extended Thinking），长链思考过程可按需展开与折叠。
 - **主流模型全面预设**：开箱支持 Claude 3.7 / 3.5、智谱 GLM-5.3 (Coding Plan) / GLM-4.7、DeepSeek-V3 / R1、OpenAI GPT-4o、OpenRouter、本地 Ollama (`http://localhost:11434`) 与 LM Studio。
-- **多商户密钥独立隔离**：各模型服务商 API 密钥本地隔离存储于浏览器 `localStorage`，零服务端数据中转。
+- **多商户密钥独立隔离与环境自动同步**：各模型服务商 API 密钥本地隔离存储于浏览器 `localStorage`；启动时支持自动从系统环境变量 (`~/.zshrc`) 同步密钥，零服务端中转。
 
 ### 3. 买方投研脚手架与反套话去脂 (Anti-AI-Slop)
 - **投研视角矩阵**：内置反共识审视、法务审计、商业模式与第一性原理等专业 Harness。
@@ -34,7 +34,7 @@
 ### 环境依赖
 - Node.js >= 18 (用于前端构建)
 - Python >= 3.8 (内置静态服务与 LLM 串流代理)
-- **macOS**：macOS 12.0+ (支持原生 Swift App 编译)
+- **macOS**：macOS 12.0+ (支持原生 Swift App 编译与 DMG 打包)
 - **Windows**：Windows 10 / 11 (内置 Microsoft Edge 或 Google Chrome)
 
 ---
@@ -42,10 +42,19 @@
 ### 平台一键运行
 
 #### 🍎 macOS 原生桌面版
-```bash
-./build_app.sh
-```
-编译完成后自动生成并安装至 `~/Applications/ThreadCanvas.app`，并在桌面生成启动快捷方式。
+1. **直接安装 DMG**（适合分发给他人）：
+   - 双击打开 **`ThreadCanvas-v1.0.2-macOS.dmg`**（或从 GitHub Releases 下载）。
+   - 将 `ThreadCanvas.app` 拖入 `Applications` 目录即可开箱即用。
+2. **源码打包 DMG 安装镜像**：
+   ```bash
+   ./build_dmg.sh
+   ```
+   自动生成高压缩比的 `.dmg` 安装包至 `release/` 与桌面。
+3. **源码本地一键编译安装**：
+   ```bash
+   ./build_app.sh
+   ```
+   编译后自动安装至 `~/Applications/ThreadCanvas.app` 并在桌面建立软链接。
 
 #### 🪟 Windows 原生桌面版
 1. **一键双击运行**：

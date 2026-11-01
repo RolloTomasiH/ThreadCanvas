@@ -41,7 +41,7 @@ cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.2</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
@@ -68,6 +68,10 @@ if [ -f "$ICON_SRC" ]; then
 elif [ -f "/tmp/candidate_icons/AppleCanvasPro.icns" ]; then
     cp "/tmp/candidate_icons/AppleCanvasPro.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
+
+# Ensure clean attributes and ad-hoc code signature for Gatekeeper
+xattr -cr "$APP_DIR" 2>/dev/null || true
+codesign --force --deep -s - "$APP_DIR" 2>/dev/null || true
 
 touch "$APP_DIR"
 
